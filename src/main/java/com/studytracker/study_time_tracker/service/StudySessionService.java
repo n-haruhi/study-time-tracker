@@ -5,7 +5,7 @@ import com.studytracker.study_time_tracker.repository.StudySessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -19,42 +19,25 @@ public class StudySessionService {
         return repository.findAll();
     }
     
-    // ID指定で取得
     public StudySession getSessionById(Long id) {
         return repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Session not found: " + id));
+                .orElseThrow(() -> new RuntimeException("Session not found"));
     }
     
-    // 新規作成
     public StudySession createSession(StudySession session) {
-        // 終了時刻がある場合、学習時間を自動計算
-        if (session.getEndTime() != null && session.getStartTime() != null) {
-            long minutes = java.time.Duration.between(
-                session.getStartTime(), 
-                session.getEndTime()
-            ).toMinutes();
-            session.setDurationMinutes((int) minutes);
-        }
+        // 終了時刻が設定されている場合、自動で学習時間を計算
+        calculateDuration(session);
         return repository.save(session);
     }
     
-    // 更新
-    public StudySession updateSession(Long id, StudySession updatedSession) {
+    public StudySession updateSession(Long id, StudySession session) {
         StudySession existing = getSessionById(id);
-        existing.setStartTime(updatedSession.getStartTime());
-        existing.setEndTime(updatedSession.getEndTime());
-        existing.setCategory(updatedSession.getCategory());
-        existing.setMemo(updatedSession.getMemo());
-        
-        // 学習時間を再計算
-        if (existing.getEndTime() != null && existing.getStartTime() != null) {
-            long minutes = java.time.Duration.between(
-                existing.getStartTime(), 
-                existing.getEndTime()
-            ).toMinutes();
-            existing.setDurationMinutes((int) minutes);
-        }
-        
+        existing.setStartTime(session.getStartTime());
+        existing.setEndTime(session.getEndTime());
+        existing.setCategory(session.getCategory());
+        existing.setMemo(session.getMemo());
+        // 終了時刻が設定されている場合、自動で学習時間を計算
+        calculateDuration(existing);
         return repository.save(existing);
     }
     
@@ -68,8 +51,11 @@ public class StudySessionService {
         return repository.findByCategory(category);
     }
     
-    // 期間で検索
-    public List<StudySession> getSessionsByDateRange(LocalDateTime start, LocalDateTime end) {
-        return repository.findByStartTimeBetween(start, end);
+    // 学習時間を自動計算するヘルパーメソッド
+    private void calculateDuration(StudySession session) {
+        if (session.getEndTime() != null && session.getStartTime() != null) {
+            Duration duration = Duration.between(session.getStartTime(), session.getEndTime());
+            session.setDurationMinutes((int) duration.toMinutes());
+        }
     }
 }
